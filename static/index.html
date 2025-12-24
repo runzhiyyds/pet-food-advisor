@@ -7,10 +7,8 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
     <!-- 配置后端 API 地址（部署时替换为实际的 Render 服务地址） -->
     <script>
-        // 生产环境：替换为你的 Render 服务地址
-        // 例如：window.API_BASE_URL = 'https://pet-food-advisor-api.onrender.com';
-        // 本地开发：注释掉这行，使用默认的 localhost:8000
-        // window.API_BASE_URL = 'https://your-render-service.onrender.com';
+        // ✅ 生产环境：指向 Render 后端服务
+        window.API_BASE_URL = 'https://pet-food-advisor.onrender.com';
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -677,6 +675,6 @@
     </div>
 
     <script type="module" src="results.js"></script>
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app_fixed.js"></script>
 </body>
 </html>

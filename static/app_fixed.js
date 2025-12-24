@@ -1,16 +1,37 @@
 // 导入产品选择模块
-import { ProductSelector } from '/static/products.js';
-import { ResultsDisplay } from '/static/results.js';
+import { ProductSelector } from './products.js';
+import { ResultsDisplay } from './results.js';
 
 // 生成或获取用户ID
 function getOrCreateUserId() {
-    let userId = localStorage.getItem('pet_food_advisor_user_id');
-    if (!userId) {
-        // 生成唯一用户ID（使用时间戳+随机数）
-        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('pet_food_advisor_user_id', userId);
+    try {
+        let userId = localStorage.getItem('pet_food_advisor_user_id');
+        if (!userId) {
+            // 生成唯一用户ID（使用时间戳+随机数）
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('pet_food_advisor_user_id', userId);
+        }
+        return userId;
+    } catch (error) {
+        // Safari 隐私模式或跟踪预防可能阻止 localStorage
+        console.warn('[WARN] localStorage 不可用，使用临时用户ID:', error.message);
+        // 使用 sessionStorage 或生成临时 ID
+        try {
+            let userId = sessionStorage.getItem('pet_food_advisor_user_id');
+            if (!userId) {
+                userId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem('pet_food_advisor_user_id', userId);
+            }
+            return userId;
+        } catch (e) {
+            // 如果 sessionStorage 也不可用，使用内存变量
+            console.warn('[WARN] sessionStorage 也不可用，使用内存变量');
+            if (!window._tempUserId) {
+                window._tempUserId = 'mem_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            }
+            return window._tempUserId;
+        }
     }
-    return userId;
 }
 
 // 全局状态管理
@@ -110,16 +131,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 检查并显示首次使用引导
 function checkAndShowOnboarding() {
-    const hasSeenOnboarding = localStorage.getItem('pet_food_advisor_onboarding_seen');
-    
-    if (!hasSeenOnboarding) {
-        // 延迟一点显示，让页面先加载完成
-        setTimeout(() => {
-            const modal = document.getElementById('onboardingModal');
-            if (modal) {
-                modal.classList.remove('hidden');
-            }
-        }, 500);
+    try {
+        const hasSeenOnboarding = localStorage.getItem('pet_food_advisor_onboarding_seen');
+        
+        if (!hasSeenOnboarding) {
+            // 延迟一点显示，让页面先加载完成
+            setTimeout(() => {
+                const modal = document.getElementById('onboardingModal');
+                if (modal) {
+                    modal.classList.remove('hidden');
+                }
+            }, 500);
+        }
+    } catch (error) {
+        console.warn('[WARN] localStorage 不可用，跳过引导检查:', error.message);
+        // 不显示引导，直接使用
     }
     
     // 绑定引导弹窗事件
@@ -138,7 +164,11 @@ function setupOnboardingEvents() {
             modal.classList.add('hidden');
         }
         // 标记为已看过引导
-        localStorage.setItem('pet_food_advisor_onboarding_seen', 'true');
+        try {
+            localStorage.setItem('pet_food_advisor_onboarding_seen', 'true');
+        } catch (error) {
+            console.warn('[WARN] 无法保存引导状态:', error.message);
+        }
     };
     
     if (closeBtn) {

@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>宠物口粮智能决策助手</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+    <!-- 配置后端 API 地址（部署时替换为实际的 Render 服务地址） -->
+    <script>
+        // 生产环境：替换为你的 Render 服务地址
+        // 例如：window.API_BASE_URL = 'https://pet-food-advisor-api.onrender.com';
+        // 本地开发：注释掉这行，使用默认的 localhost:8000
+        // window.API_BASE_URL = 'https://your-render-service.onrender.com';
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* 宠物训练类APP风格 - 温馨治愈的扁平插画风格 */
+        :root {
+            /* 马卡龙色系 */
+            --primary-orange: #FFB366;
+            --primary-purple: #C8A8E9;
+            --primary-green: #A8E6CF;
+            --primary-blue: #87CEEB;
+            --primary-pink: #FFB6C1;
+            --cream-white: #FFF8F0;
+            --soft-gray: #F5F5F5;
+            --text-dark: #4A4A4A;
+            --text-light: #8B8B8B;
+            
+            /* 渐变色 */
+            --gradient-warm: linear-gradient(135deg, var(--primary-orange) 0%, var(--primary-pink) 100%);
+            --gradient-cool: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+            --gradient-nature: linear-gradient(135deg, var(--primary-green) 0%, var(--primary-blue) 100%);
+        }
+        
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #FFF8F0 0%, #F0F8FF 50%, #F5FFFA 100%);
+            color: var(--text-dark);
+        }
+        
+        /* 步骤指示器 - 圆润可爱风格 */
+        .step-indicator {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border: 3px solid transparent;
+        }
+        
+        .step-active {
+            background: var(--gradient-warm);
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(255, 179, 102, 0.4);
+        }
+        
+        .step-completed {
+            background: var(--primary-green);
+            color: white;
+            box-shadow: 0 4px 12px rgba(168, 230, 207, 0.4);
+        }
+        
+        .step-completed::after {
+            content: '✓';
+            font-weight: bold;
+        }
+        
+        /* 卡片样式 - 圆角柔和 */
+        .pet-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pet-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-warm);
+        }
+        
+        .pet-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.12);
+        }
+        
+        /* 按钮样式 - 轻拟物设计 */
+        .btn-primary {
+            background: var(--gradient-warm);
+            border: none;
+            border-radius: 16px;
+            padding: 12px 24px;
+            font-weight: 600;
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(255, 179, 102, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(255, 179, 102, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--gradient-cool);
+            border: none;
+            border-radius: 16px;
+            padding: 12px 24px;
+            font-weight: 600;
+            color: white;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 16px rgba(200, 168, 233, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(200, 168, 233, 0.4);
+        }
+        
+        /* 输入框样式 */
+        .form-input {
+            border: 2px solid #E8E8E8;
+            border-radius: 12px;
+            padding: 12px 16px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .form-input:focus {
+            border-color: var(--primary-orange);
+            box-shadow: 0 0 0 4px rgba(255, 179, 102, 0.1);
+            outline: none;
+        }
+        
+        /* 宠物类型选择 - 可爱卡片 */
+        .pet-type-card {
+            border: 3px solid #E8E8E8;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: white;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pet-type-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, var(--primary-orange) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .pet-type-card:hover {
+            border-color: var(--primary-orange);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(255, 179, 102, 0.2);
+        }
+        
+        .pet-type-card:hover::before {
+            opacity: 0.05;
+        }
+        
+        .pet-type-card.selected {
+            border-color: var(--primary-orange);
+            background: linear-gradient(135deg, rgba(255, 179, 102, 0.1) 0%, rgba(255, 182, 193, 0.1) 100%);
+            box-shadow: 0 8px 24px rgba(255, 179, 102, 0.2);
+        }
+        
+        /* 使用peer选择器支持radio选中状态 */
+        input[type="radio"]:checked + .pet-type-card {
+            border-color: var(--primary-orange);
+            background: linear-gradient(135deg, rgba(255, 179, 102, 0.1) 0%, rgba(255, 182, 193, 0.1) 100%);
+            box-shadow: 0 8px 24px rgba(255, 179, 102, 0.2);
+        }
+        
+        /* 宠物图标动画 */
+        .pet-icon {
+            font-size: 3rem;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+        
+        .pet-type-card:hover .pet-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+        
+        /* 健康状况标签 */
+        .health-tag {
+            background: var(--cream-white);
+            border: 2px solid var(--primary-green);
+            border-radius: 20px;
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-dark);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .health-tag:hover {
+            background: var(--primary-green);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .health-tag.selected {
+            background: var(--primary-green);
+            color: white;
+            box-shadow: 0 4px 12px rgba(168, 230, 207, 0.4);
+        }
+        
+        /* 动画效果 */
+        .fade-in {
+            animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(30px);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0);
+            }
+        }
+        
+        /* 可爱的装饰元素 */
+        .decoration-paw {
+            position: absolute;
+            color: var(--primary-orange);
+            opacity: 0.1;
+            font-size: 2rem;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        /* 头部样式 */
+        .header-gradient {
+            background: linear-gradient(135deg, white 0%, var(--cream-white) 100%);
+            border-bottom: 1px solid rgba(255, 179, 102, 0.1);
+        }
+        
+        .logo-icon {
+            background: var(--gradient-warm);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 装饰性爪印 -->
+    <div class="decoration-paw" style="top: 10%; left: 5%;">🐾</div>
+    <div class="decoration-paw" style="top: 20%; right: 8%; animation-delay: 1s;">🐾</div>
+    <div class="decoration-paw" style="bottom: 15%; left: 10%; animation-delay: 2s;">🐾</div>
+    
+    <!-- 头部 -->
+    <header class="header-gradient shadow-sm">
+        <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2 sm:space-x-4">
+                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-orange-300 to-pink-300 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-paw text-xl sm:text-2xl text-white"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg sm:text-2xl font-bold text-gray-800">🐱 宠物口粮智能助手 🐶</h1>
+                        <p class="text-xs sm:text-sm text-gray-600 hidden sm:block">科学选粮，为爱宠健康护航 ✨</p>
+                    </div>
+                </div>
+                <div class="hidden lg:flex items-center space-x-2 text-sm text-gray-500">
+                    <i class="fas fa-heart text-pink-400"></i>
+                    <span>和你一起，认真为每一只宠物挑一碗更合适的粮</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 步骤指示器 -->
+        <div class="mb-4 sm:mb-8 px-2">
+            <div class="flex justify-between items-center max-w-4xl mx-auto">
+                <div class="flex-1 flex items-center">
+                    <div id="step1-indicator" class="step-indicator step-active w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-sm sm:text-base">1</div>
+                    <div class="flex-1 h-1 bg-gray-300 mx-1 sm:mx-2"></div>
+                </div>
+                <div class="flex-1 flex items-center">
+                    <div id="step2-indicator" class="step-indicator w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold bg-gray-300 text-gray-600 text-sm sm:text-base">2</div>
+                    <div class="flex-1 h-1 bg-gray-300 mx-1 sm:mx-2"></div>
+                </div>
+                <div class="flex-1 flex items-center">
+                    <div id="step3-indicator" class="step-indicator w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold bg-gray-300 text-gray-600 text-sm sm:text-base">3</div>
+                    <div class="flex-1 h-1 bg-gray-300 mx-1 sm:mx-2"></div>
+                </div>
+                <div>
+                    <div id="step4-indicator" class="step-indicator w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold bg-gray-300 text-gray-600 text-sm sm:text-base">4</div>
+                </div>
+            </div>
+            <div class="flex justify-between max-w-4xl mx-auto mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 px-1">
+                <span class="flex-1 text-center">宠物信息</span>
+                <span class="flex-1 text-center">选择产品</span>
+                <span class="flex-1 text-center">智能分析</span>
+                <span class="flex-1 text-center">查看结果</span>
+            </div>
+        </div>
+
+        <!-- 步骤1: 宠物信息 -->
+        <div id="step1-content" class="fade-in">
+            <div class="max-w-4xl mx-auto pet-card p-8">
+                <!-- 顶部操作按钮 -->
+                <div class="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-8 pb-4 border-b-2 border-gray-200 gap-3 sm:gap-0">
+                    <div class="hidden sm:block w-24"></div> <!-- PC端占位，移动端隐藏 -->
+                    <div class="text-center flex-1">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800 mb-1">
+                            告诉我们关于您的小宝贝 🥰
+                        </h2>
+                        <p class="text-xs sm:text-sm text-gray-600">让我们更好地了解您的爱宠，为它量身定制营养方案</p>
+                    </div>
+                    <button type="submit" form="petInfoForm" id="nextStepTop" class="btn-primary text-sm sm:text-lg px-4 sm:px-6 py-2 sm:py-3 w-full sm:w-auto">
+                        <span class="hidden sm:inline">下一步：选择产品 ✨</span>
+                        <span class="sm:hidden">下一步 ✨</span>
+                        <i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+                
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-orange-300 to-pink-300 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-heart text-2xl text-white"></i>
+                    </div>
+                </div>
+                
+                <form id="petInfoForm">
+                    <!-- 必填信息 -->
+                    <div class="space-y-8">
+                        <div>
+                            <label class="block text-lg font-bold text-gray-800 mb-4 text-center">
+                                您的爱宠是？ <span class="text-orange-400">*</span>
+                            </label>
+                            <div class="grid grid-cols-2 gap-6 max-w-md mx-auto">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="species" value="猫" class="peer hidden" required>
+                                    <div class="pet-type-card">
+                                        <i class="fas fa-cat pet-icon text-orange-400"></i>
+                                        <p class="mt-3 font-bold text-lg">猫咪 🐱</p>
+                                        <p class="text-sm text-gray-500 mt-1">优雅的小公主/王子</p>
+                                    </div>
+                                </label>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="species" value="狗" class="peer hidden">
+                                    <div class="pet-type-card">
+                                        <i class="fas fa-dog pet-icon text-blue-400"></i>
+                                        <p class="mt-3 font-bold text-lg">狗狗 🐶</p>
+                                        <p class="text-sm text-gray-500 mt-1">忠诚的小伙伴</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="max-w-2xl mx-auto">
+                            <label class="block text-lg font-bold text-gray-800 mb-3">
+                                品种 <span class="text-orange-400">*</span>
+                            </label>
+                            <input type="text" id="breed" placeholder="例如：英国短毛猫、金毛、布偶猫等" required
+                                class="form-input w-full text-lg">
+                            <p class="text-sm text-gray-500 mt-2 flex items-center">
+                                <i class="fas fa-lightbulb text-yellow-400 mr-2"></i>
+                                不确定品种？可以填写"混种"或"中华田园猫/犬"
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
+                            <div>
+                                <label class="block text-lg font-bold text-gray-800 mb-3">
+                                    年龄 <span class="text-orange-400">*</span>
+                                </label>
+                                <input type="number" id="ageValue" min="0" required
+                                    class="form-input w-full text-lg">
+                            </div>
+                            <div>
+                                <label class="block text-lg font-bold text-gray-800 mb-3">
+                                    单位 <span class="text-orange-400">*</span>
+                                </label>
+                                <select id="ageUnit" required class="form-input w-full text-lg">
+                                    <option value="月">月</option>
+                                    <option value="年">年</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="max-w-3xl mx-auto">
+                            <label class="block text-lg font-bold text-gray-800 mb-4 text-center">
+                                健康状况 <span class="text-orange-400">*</span> 
+                                <span class="text-sm font-normal text-gray-500">(最多选2项)</span>
+                            </label>
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <label class="health-tag cursor-pointer text-center">
+                                    <input type="checkbox" name="health" value="健康" class="health-checkbox hidden">
+                                    <span>😊 健康</span>
+                                </label>
+                                <label class="health-tag cursor-pointer text-center">
+                                    <input type="checkbox" name="health" value="易胖/正在减重" class="health-checkbox hidden">
+                                    <span>⚖️ 易胖/减重</span>
+                                </label>
+                                <label class="health-tag cursor-pointer text-center">
+                                    <input type="checkbox" name="health" value="泌尿问题" class="health-checkbox hidden">
+                                    <span>💧 泌尿问题</span>
+                                </label>
+                                <label class="health-tag cursor-pointer text-center">
+                                    <input type="checkbox" name="health" value="肾脏问题" class="health-checkbox hidden">
+                                    <span>🫘 肾脏问题</span>
+                                </label>
+                                <label class="health-tag cursor-pointer text-center">
+                                    <input type="checkbox" name="health" value="肠胃敏感" class="health-checkbox hidden">
+                                    <span>🤢 肠胃敏感</span>
+                                </label>
+                                <label class="health-tag cursor-pointer text-center">
+                                    <input type="checkbox" name="health" value="皮肤毛发问题" class="health-checkbox hidden">
+                                    <span>✨ 毛发问题</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 更多选项按钮 -->
+                        <div class="text-center">
+                            <button type="button" id="toggleMoreOptions" 
+                                class="btn-secondary flex items-center justify-center mx-auto space-x-2">
+                                <span>🔧 更多选项（可选）</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+
+                        <!-- 可选信息（默认隐藏） -->
+                        <div id="moreOptions" class="hidden space-y-8 pt-8 border-t-2 border-gray-100">
+                            <div class="grid grid-cols-2 gap-6 max-w-2xl mx-auto">
+                                <div>
+                                    <label class="block text-lg font-bold text-gray-800 mb-3">💪 体重 (kg)</label>
+                                    <input type="number" id="weight" step="0.1" min="0"
+                                        class="form-input w-full text-lg">
+                                </div>
+                                <div>
+                                    <label class="block text-lg font-bold text-gray-800 mb-3">✂️ 是否绝育</label>
+                                    <select id="isNeutered" class="form-input w-full text-lg">
+                                        <option value="">请选择</option>
+                                        <option value="true">是</option>
+                                        <option value="false">否</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="max-w-2xl mx-auto">
+                                <label class="block text-lg font-bold text-gray-800 mb-3">🏃 活动水平</label>
+                                <select id="activityLevel" class="form-input w-full text-lg">
+                                    <option value="">请选择</option>
+                                    <option value="安静">🛌 安静（宅家型）</option>
+                                    <option value="一般">🚶 一般（正常活动）</option>
+                                    <option value="非常活跃">🏃 非常活跃（运动达人）</option>
+                                </select>
+                            </div>
+
+                            <div class="max-w-2xl mx-auto">
+                                <label class="block text-lg font-bold text-gray-800 mb-3">🍽️ 饮食偏好</label>
+                                <select id="eatingPreference" class="form-input w-full text-lg">
+                                    <option value="">请选择</option>
+                                    <option value="贪吃">😋 贪吃（什么都爱）</option>
+                                    <option value="正常">😊 正常（不挑食）</option>
+                                    <option value="挑食">🤔 挑食（很有想法）</option>
+                                </select>
+                            </div>
+
+                            <div class="max-w-3xl mx-auto">
+                                <label class="block text-lg font-bold text-gray-800 mb-4">🚫 过敏/忌口</label>
+                                <div class="grid grid-cols-3 gap-3 mb-4">
+                                    <label class="health-tag cursor-pointer text-center">
+                                        <input type="checkbox" name="allergies" value="鸡肉" class="hidden">
+                                        <span>🐔 鸡肉</span>
+                                    </label>
+                                    <label class="health-tag cursor-pointer text-center">
+                                        <input type="checkbox" name="allergies" value="牛肉" class="hidden">
+                                        <span>🐄 牛肉</span>
+                                    </label>
+                                    <label class="health-tag cursor-pointer text-center">
+                                        <input type="checkbox" name="allergies" value="鱼类" class="hidden">
+                                        <span>🐟 鱼类</span>
+                                    </label>
+                                    <label class="health-tag cursor-pointer text-center">
+                                        <input type="checkbox" name="allergies" value="谷物" class="hidden">
+                                        <span>🌾 谷物</span>
+                                    </label>
+                                    <label class="health-tag cursor-pointer text-center">
+                                        <input type="checkbox" name="allergies" value="乳制品" class="hidden">
+                                        <span>🥛 乳制品</span>
+                                    </label>
+                                </div>
+                                <input type="text" id="customAllergies" placeholder="其他过敏源（用逗号分隔）"
+                                    class="form-input w-full text-lg">
+                            </div>
+
+                            <div class="max-w-2xl mx-auto">
+                                <label class="block text-lg font-bold text-gray-800 mb-3">👩‍⚕️ 医生叮嘱/历史禁忌</label>
+                                <textarea id="doctorNotes" rows="3" placeholder="请输入医生的特殊建议或历史禁忌..."
+                                    class="form-input w-full text-lg resize-none"></textarea>
+                            </div>
+
+                            <!-- 简化预算输入：仅在需要时填写价格区间 -->
+                            <div class="max-w-2xl mx-auto space-y-4 p-6 bg-orange-50 rounded-2xl border-2 border-orange-200">
+                                <div>
+                                    <label class="block text-lg font-bold text-gray-800 mb-3">每月可接受总预算（元）</label>
+                                    <input type="number" id="monthlyBudget" min="0"
+                                        class="form-input w-full text-lg">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-lg font-bold text-gray-800 mb-3">单斤最低价（元）</label>
+                                        <input type="number" id="priceMin" min="0" step="0.1"
+                                            class="form-input w-full text-lg">
+                                    </div>
+                                    <div>
+                                        <label class="block text-lg font-bold text-gray-800 mb-3">单斤最高价（元）</label>
+                                        <input type="number" id="priceMax" min="0" step="0.1"
+                                            class="form-input w-full text-lg">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+                
+                <!-- 底部操作按钮 -->
+                <div class="flex justify-center items-center pt-4 sm:pt-6 border-t-2 border-gray-200 mt-6 sm:mt-8">
+                    <button type="button" id="nextStepBottom" class="btn-primary text-base sm:text-xl px-8 sm:px-12 py-3 sm:py-4 w-full sm:w-auto">
+                        下一步：选择产品 ✨
+                        <i class="fas fa-arrow-right ml-2 sm:ml-3"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步骤2-4的内容将在后续任务中实现 -->
+        <div id="step2-content" class="hidden"></div>
+        <div id="step3-content" class="hidden"></div>
+        <div id="step4-content" class="hidden"></div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-gradient-to-r from-orange-100 to-pink-100 mt-16 py-8 border-t border-orange-200">
+        <div class="container mx-auto px-4 text-center">
+            <div class="flex items-center justify-center space-x-2 mb-4">
+                <i class="fas fa-heart text-pink-400"></i>
+                <span class="text-gray-700 font-medium">用爱守护每一只毛孩子</span>
+                <i class="fas fa-heart text-pink-400"></i>
+            </div>
+            <p class="text-sm text-gray-600">© 2025 宠物口粮智能助手 | 科学选粮，为爱宠健康护航 🐾</p>
+        </div>
+    </footer>
+
+    <!-- 首次使用引导 -->
+    <div id="onboardingModal" class="hidden fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="p-6 sm:p-8">
+                <!-- 关闭按钮 -->
+                <div class="flex justify-end mb-4">
+                    <button id="closeOnboarding" class="text-gray-400 hover:text-gray-600 transition">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <!-- 引导内容 -->
+                <div class="text-center mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-orange-300 to-pink-300 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-paw text-3xl text-white"></i>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+                        欢迎使用宠物口粮智能助手 🎉
+                    </h2>
+                    <p class="text-gray-600 text-sm sm:text-base">
+                        让我们帮您为爱宠找到最合适的口粮
+                    </p>
+                </div>
+                
+                <!-- 使用流程 -->
+                <div class="space-y-4 mb-6">
+                    <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-orange-50 to-pink-50 rounded-xl">
+                        <div class="w-10 h-10 rounded-full bg-orange-400 flex items-center justify-center text-white font-bold flex-shrink-0">1</div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 mb-1">填写宠物信息</h3>
+                            <p class="text-sm text-gray-600">告诉我们您的爱宠的基本信息、健康状况和特殊需求</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl">
+                        <div class="w-10 h-10 rounded-full bg-blue-400 flex items-center justify-center text-white font-bold flex-shrink-0">2</div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 mb-1">选择产品</h3>
+                            <p class="text-sm text-gray-600">从产品库中挑选，或让系统智能推荐，也可以手动输入产品信息</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl">
+                        <div class="w-10 h-10 rounded-full bg-purple-400 flex items-center justify-center text-white font-bold flex-shrink-0">3</div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 mb-1">AI 智能分析</h3>
+                            <p class="text-sm text-gray-600">系统会基于营养、适配度、安全性等维度进行深度分析</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-start gap-4 p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-xl">
+                        <div class="w-10 h-10 rounded-full bg-green-400 flex items-center justify-center text-white font-bold flex-shrink-0">4</div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 mb-1">查看结果</h3>
+                            <p class="text-sm text-gray-600">获得专业的分析报告和产品排名，帮您做出最佳选择</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 特色说明 -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <i class="fas fa-lightbulb text-yellow-500 mr-3 mt-1"></i>
+                        <div class="text-sm text-yellow-800">
+                            <p class="font-semibold mb-1">💡 小贴士</p>
+                            <p>• 我们采用匿名化分析，确保评分客观公正</p>
+                            <p>• 支持按营养排名和性价比排名两种视角</p>
+                            <p>• 所有分析基于科学营养标准，仅供参考</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 操作按钮 -->
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button id="skipOnboarding" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold">
+                        稍后了解
+                    </button>
+                    <button id="startOnboarding" class="px-6 py-3 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg hover:from-orange-600 hover:to-pink-600 transition font-semibold">
+                        开始使用 ✨
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/static/results.js"></script>
+    <script type="module" src="/static/app_fixed.js"></script>
+</body>
+</html>

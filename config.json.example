@@ -1,0 +1,12 @@
+{
+  "database": {
+    "host": "your_mysql_host",
+    "port": 3306,
+    "user": "your_mysql_user",
+    "password": "your_mysql_password",
+    "database": "7hmbua0z"
+  },
+  "api": {
+    "base_url": "http://localhost:8000"
+  }
+}

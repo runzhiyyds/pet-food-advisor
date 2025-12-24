@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+mysql-connector-python==8.0.33
+python-multipart
+pydantic
+requests
+cryptography>=3.4.8

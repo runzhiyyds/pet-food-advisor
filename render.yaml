@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: pet-food-advisor-api
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main_sqlite:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.11
+

@@ -1,0 +1,13 @@
+{
+  "name": "page-deploy-skill",
+  "version": "1.0.0",
+  "description": "发布 H5 页面到 CDN 和 HTML 服务器",
+  "dependencies": {
+    "@tencent/fupload": "^3.0.1",
+    "@tencent/tupload2": "^2.0.1",
+    "chalk": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

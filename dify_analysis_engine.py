@@ -18,8 +18,9 @@ class DifyAnalysisEngine:
     """Dify分析引擎"""
     
     def __init__(self):
-        self.api_key = "app-3o5uI4DCu1J8ab5T2eFimcc0"
-        self.api_url = "http://api.dify.woa.com/v1/workflows/run"
+        # ✅ 使用公网 Dify API
+        self.api_key = "app-H3Owfh8VRao6bUv6wFgRt7Kg"
+        self.api_url = "https://api.dify.ai/v1/workflows/run"
         self.timeout = 90  # 90秒超时
     
     def analyze_products_with_progress(
@@ -190,8 +191,8 @@ class DifyAnalysisEngine:
             print(f"[DEBUG] 测试网络连接...")
             try:
                 import socket
-                host = "api.dify.woa.com"
-                port = 80
+                host = "api.dify.ai"  # ✅ 改为公网域名
+                port = 443  # ✅ 使用 HTTPS 端口
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.settimeout(5)
                 result = sock.connect_ex((host, port))

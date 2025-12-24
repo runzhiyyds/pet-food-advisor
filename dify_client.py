@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DifyClient:
-    def __init__(self, api_key: str = "app-3o5uI4DCu1J8ab5T2eFimcc0", base_url: str = "http://api.dify.woa.com"):
+    def __init__(self, api_key: str = "app-H3Owfh8VRao6bUv6wFgRt7Kg", base_url: str = "https://api.dify.ai"):
         """初始化Dify客户端"""
         self.api_key = api_key
         self.base_url = base_url
@@ -197,7 +197,10 @@ class DifyClient:
         }
 
 # 全局Dify客户端实例
-dify_client = DifyClient()
+dify_client = DifyClient(
+    api_key="app-H3Owfh8VRao6bUv6wFgRt7Kg",
+    base_url="https://api.dify.ai"
+)
 
 def analyze_products_with_dify(pet_info: Dict[str, Any], products: list, user_id: str = "chenyuanguo") -> list:
     """

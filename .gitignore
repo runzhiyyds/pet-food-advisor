@@ -12,11 +12,11 @@ ENV/
 dist/
 build/
 
-# 数据库
-*.db
+# 数据库（保留主数据库，排除备份）
+*.backup.db
 *.sqlite
 *.sqlite3
-pet_food_selection.db
+# pet_food_selection.db  # 取消忽略主数据库
 
 # IDE
 .vscode/

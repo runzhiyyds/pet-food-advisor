@@ -10,8 +10,10 @@ const appState = {
     analysisResult: null
 };
 
-// API基础URL
-const API_BASE = window.location.origin;
+// API基础URL - 生产环境指向Render后端
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? window.location.origin  // 本地开发环境
+    : 'https://pet-food-advisor.onrender.com';  // 生产环境
 
 // 导出到window供全局使用
 window.appState = appState;

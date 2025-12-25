@@ -1062,6 +1062,23 @@ async def startup_event():
     
     logger.info("🎉 应用启动完成！（已关闭产品库自检，不再自动删除任何产品）")
 
+# 兼容性路由：支持从根路径访问静态JS文件（用于本地开发）
+# 这样 ./results.js 和 ./app_fixed.js 都能正确加载
+@app.get("/{filename}")
+async def serve_static_files(filename: str):
+    """
+    为静态文件提供根路径访问支持
+    主要用于兼容 index.html 中的相对路径引用
+    """
+    import os
+    # 只处理 .js 和 .css 文件
+    if filename.endswith(('.js', '.css', '.map')):
+        file_path = f"static/{filename}"
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+    # 其他请求返回 404
+    raise HTTPException(status_code=404, detail="Not found")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

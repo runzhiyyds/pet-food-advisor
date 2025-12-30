@@ -176,7 +176,132 @@ const HistoryManager = {
     },
     
     /**
-     * 渲染历史记录页面
+     * 渲染历史记录抽屉（抽屉式弹窗）
+     * @param {HTMLElement} container - 容器元素
+     */
+    renderDrawer(container) {
+        const history = this.getHistory();
+        
+        if (history.length === 0) {
+            container.innerHTML = `
+                <div class="p-6">
+                    <!-- 抽屉头部 -->
+                    <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                            <i class="fas fa-history mr-2 text-purple-500"></i>历史记录
+                        </h2>
+                        <button onclick="window.closeHistoryDrawer()" 
+                                class="text-gray-400 hover:text-gray-600 transition-colors">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- 空状态 -->
+                    <div class="text-center py-12">
+                        <div class="text-gray-400 text-5xl mb-4">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800 mb-2">暂无历史记录</h3>
+                        <p class="text-gray-600 text-sm">您还没有进行过分析，快去试试吧！</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        const historyHTML = history.map(item => {
+            const petInfo = item.pet_info || {};
+            const speciesEmoji = petInfo.species === 'cat' ? '🐱' : '🐶';
+            const speciesText = petInfo.species === 'cat' ? '猫咪' : '狗狗';
+            const productCount = (item.selected_products?.length || 0) + (item.custom_products?.length || 0);
+            
+            return `
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-3 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center flex-1">
+                            <span class="text-2xl mr-2">${speciesEmoji}</span>
+                            <div class="flex-1">
+                                <h3 class="text-sm font-bold text-gray-800">${speciesText}分析</h3>
+                                <p class="text-xs text-gray-500">${this.formatTimestamp(item.timestamp)}</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 mb-3 text-xs text-gray-600">
+                        <div class="flex items-center">
+                            <i class="fas fa-birthday-cake mr-1 text-purple-500 text-xs"></i>
+                            ${petInfo.age_months ? `${Math.floor(petInfo.age_months / 12)}岁${petInfo.age_months % 12}个月` : '未知'}
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-weight mr-1 text-blue-500 text-xs"></i>
+                            ${petInfo.weight_kg ? `${petInfo.weight_kg}kg` : '未知'}
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-heart mr-1 text-red-500 text-xs"></i>
+                            ${petInfo.health_status || '健康'}
+                        </div>
+                        <div class="flex items-center">
+                            <i class="fas fa-box mr-1 text-green-500 text-xs"></i>
+                            ${productCount} 款产品
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 pt-3 border-t border-gray-100">
+                        <button onclick="window.viewHistory('${item.id}')" 
+                                class="btn-primary flex-1 py-2 text-xs">
+                            <i class="fas fa-eye mr-1"></i>查看
+                        </button>
+                        <button onclick="window.shareHistory('${item.id}')" 
+                                class="btn-secondary px-3 py-2 text-xs">
+                            <i class="fas fa-share-alt"></i>
+                        </button>
+                        <button onclick="window.deleteHistory('${item.id}')" 
+                                class="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg text-xs transition-colors">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = `
+            <div class="h-full flex flex-col">
+                <!-- 抽屉头部 -->
+                <div class="flex-shrink-0 bg-gradient-to-r from-purple-500 to-pink-500 p-6 text-white">
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-xl font-bold flex items-center">
+                            <i class="fas fa-history mr-2"></i>我的历史记录
+                        </h2>
+                        <button onclick="window.closeHistoryDrawer()" 
+                                class="text-white hover:text-purple-100 transition-colors">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+                    <p class="text-purple-100 text-sm">共 ${history.length} 条分析记录</p>
+                </div>
+                
+                <!-- 操作按钮栏 -->
+                <div class="flex-shrink-0 flex gap-2 p-4 border-b border-gray-200 bg-gray-50">
+                    <button onclick="window.closeHistoryDrawer()" 
+                            class="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors text-sm">
+                        <i class="fas fa-times mr-1"></i>关闭
+                    </button>
+                    <button onclick="window.clearAllHistory()" 
+                            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm">
+                        <i class="fas fa-trash-alt mr-1"></i>清空全部
+                    </button>
+                </div>
+                
+                <!-- 历史记录列表 -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    ${historyHTML}
+                </div>
+            </div>
+        `;
+    },
+    
+    /**
+     * 渲染历史记录页面（保留原方法用于兼容）
      * @param {HTMLElement} container - 容器元素
      */
     render(container) {

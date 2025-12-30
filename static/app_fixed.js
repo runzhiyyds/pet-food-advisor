@@ -620,13 +620,31 @@ async function handlePetInfoSubmit() {
         
         // 提交到后端
         console.log('[DEBUG] 发送请求到:', `${API_BASE}/api/pet/create`);
-        const response = await fetch(`${API_BASE}/api/pet/create`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(petData)
-        });
+        
+        // 显示加载提示（如果Render实例休眠，首次请求可能需要50秒）
+        showMessage('正在保存宠物信息，请稍候...', 'info');
+        
+        let response;
+        try {
+            response = await fetch(`${API_BASE}/api/pet/create`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(petData),
+                // 设置超时时间（60秒，考虑Render休眠唤醒时间）
+                signal: AbortSignal.timeout(60000)
+            });
+        } catch (error) {
+            if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+                console.error('[ERROR] 请求超时:', error);
+                showMessage('请求超时，可能是服务器正在唤醒（免费版首次请求可能需要50秒），请稍后重试', 'warning');
+                return;
+            }
+            console.error('[ERROR] 网络错误:', error);
+            showMessage('网络连接失败，请检查网络后重试', 'error');
+            return;
+        }
         
         console.log('[DEBUG] 响应状态码:', response.status);
         console.log('[DEBUG] 响应状态文本:', response.statusText);

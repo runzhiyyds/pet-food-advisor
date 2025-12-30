@@ -1,6 +1,8 @@
-// 导入产品选择模块
+// 导入模块
 import { ProductSelector } from './products.js';
 import { ResultsDisplay } from './results.js';
+import { HistoryManager } from './history.js';
+import { ShareManager } from './share.js';
 
 // 生成或获取用户ID
 function getOrCreateUserId() {
@@ -1022,6 +1024,27 @@ function renderAnalysisResults(analysisResult) {
             </div>
         `;
         return;
+    }
+
+    // 💾 保存到历史记录
+    if (window.HistoryManager && appState.petInfo) {
+        try {
+            const historyId = window.HistoryManager.saveHistory({
+                pet_info: appState.petInfo,
+                selected_products: appState.selectedProducts || [],
+                custom_products: appState.customProducts || [],
+                analysis_result: analysisResult
+            });
+            
+            if (historyId) {
+                console.log('[HISTORY] 分析结果已保存到历史记录:', historyId);
+                
+                // 在结果页面顶部显示分享按钮
+                appState.currentHistoryId = historyId;
+            }
+        } catch (error) {
+            console.error('[HISTORY] 保存历史记录失败:', error);
+        }
     }
 
     // 将结果交给 ResultsDisplay 中的逻辑渲染

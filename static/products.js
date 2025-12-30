@@ -5,14 +5,89 @@ export const ProductSelector = {
     filteredProducts: [],
     currentCategory: "全部",
     
+    // 产品缓存配置
+    CACHE_KEY: 'pet_food_products_cache',
+    CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24小时
+    
     // 初始化产品选择页面
     async init(container, petInfo) {
         this.petInfo = petInfo;
+        
+        // 先渲染骨架屏
+        this.renderSkeleton(container);
+        
+        // 异步加载产品
         await this.loadProducts();
+        
+        // 重新渲染实际内容
         this.render(container);
     },
     
-    // 加载产品列表
+    // 渲染骨架屏
+    renderSkeleton(container) {
+        container.innerHTML = `
+            <div class="max-w-7xl mx-auto pet-card p-4 sm:p-8">
+                <div class="flex justify-between items-center mb-8 pb-4 border-b-2 border-gray-200">
+                    <div class="h-10 w-32 bg-gray-200 animate-pulse rounded"></div>
+                    <div class="h-8 w-48 bg-gray-200 animate-pulse rounded"></div>
+                    <div class="h-10 w-32 bg-gray-200 animate-pulse rounded"></div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    ${Array(6).fill(0).map(() => `
+                        <div class="border rounded-lg p-4 animate-pulse">
+                            <div class="h-48 bg-gray-200 rounded mb-4"></div>
+                            <div class="h-6 bg-gray-200 rounded mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    },
+    
+    // 从缓存获取产品
+    getCachedProducts(species) {
+        try {
+            const cacheKey = `${this.CACHE_KEY}_${species}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (!cached) return null;
+            
+            const data = JSON.parse(cached);
+            
+            // 检查是否过期
+            if (Date.now() - data.timestamp > this.CACHE_EXPIRY) {
+                localStorage.removeItem(cacheKey);
+                console.log('[CACHE] 缓存已过期，已清除');
+                return null;
+            }
+            
+            console.log(`[CACHE] 命中缓存，产品数量: ${data.products.length}`);
+            return data.products;
+        } catch (error) {
+            console.warn('[CACHE] 读取缓存失败:', error);
+            return null;
+        }
+    },
+    
+    // 保存产品到缓存
+    setCachedProducts(species, products) {
+        try {
+            const cacheKey = `${this.CACHE_KEY}_${species}`;
+            const data = {
+                timestamp: Date.now(),
+                species: species,
+                products: products
+            };
+            localStorage.setItem(cacheKey, JSON.stringify(data));
+            console.log(`[CACHE] 产品已缓存，数量: ${products.length}`);
+        } catch (error) {
+            console.warn('[CACHE] 保存缓存失败（可能存储空间不足）:', error);
+            // 存储失败不影响功能，忽略
+        }
+    },
+    
+    // 加载产品列表（优化版：缓存 + 懒加载）
     async loadProducts() {
         try {
             if (!this.petInfo || !this.petInfo.species) {
@@ -22,6 +97,18 @@ export const ProductSelector = {
             }
             
             const species = this.petInfo.species;
+            
+            // 1. 尝试从缓存读取
+            const cachedProducts = this.getCachedProducts(species);
+            if (cachedProducts && cachedProducts.length > 0) {
+                this.allProducts = cachedProducts;
+                this.filteredProducts = [...this.allProducts];
+                console.log('[CACHE] 使用缓存产品');
+                return; // 直接返回，不请求API
+            }
+            
+            // 2. 缓存未命中，从API加载
+            console.log('[API] 从服务器加载产品...');
             const response = await fetch(`${window.API_BASE}/api/products?species=${species}&limit=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
@@ -37,6 +124,11 @@ export const ProductSelector = {
             if (data.success && data.products) {
                 this.allProducts = Array.isArray(data.products) ? data.products : [];
                 this.filteredProducts = [...this.allProducts];
+                
+                // 3. 保存到缓存
+                if (this.allProducts.length > 0) {
+                    this.setCachedProducts(species, this.allProducts);
+                }
                 
                 if (this.allProducts.length === 0) {
                     console.warn('产品列表为空');

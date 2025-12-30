@@ -96,11 +96,15 @@ export const ResultsDisplay = {
                     </div>
                 </div>
                 
-                <!-- 导出按钮 -->
+                <!-- 导出和分享按钮 -->
                 <div class="flex justify-center gap-4 mb-6">
                     <button id="exportResultBtn" class="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition font-semibold shadow-lg">
                         <i class="fas fa-download mr-2"></i>
                         导出分析结果图片
+                    </button>
+                    <button id="shareResultBtn" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition font-semibold shadow-lg">
+                        <i class="fas fa-share-alt mr-2"></i>
+                        分享结果
                     </button>
                 </div>
                 
@@ -463,6 +467,24 @@ export const ResultsDisplay = {
             this.currentSortMode = 'budget';
             this.renderProductsList();
             this.updateSortButtons();
+        });
+        
+        // 分享结果
+        document.getElementById('shareResultBtn')?.addEventListener('click', () => {
+            if (!window.ShareManager || !window.appState) return;
+            
+            const shareLink = window.ShareManager.generateShareLink({
+                pet_info: window.appState.petInfo,
+                selected_products: window.appState.selectedProducts || [],
+                custom_products: window.appState.customProducts || [],
+                analysis_result: this.analysisResult
+            });
+            
+            if (shareLink) {
+                window.ShareManager.showShareModal(shareLink, window.appState.currentHistoryId);
+            } else {
+                window.showMessage && window.showMessage('生成分享链接失败', 'error');
+            }
         });
         
         // 返回产品选择

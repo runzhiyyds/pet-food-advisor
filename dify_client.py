@@ -8,6 +8,7 @@ import requests
 import json
 import logging
 import time
+import os
 from typing import Dict, Any, Optional
 
 # 配置日志
@@ -15,9 +16,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DifyClient:
-    def __init__(self, api_key: str = "app-H3Owfh8VRao6bUv6wFgRt7Kg", base_url: str = "https://api.dify.ai"):
+    def __init__(self, api_key: str = None, base_url: str = "https://api.dify.ai"):
         """初始化Dify客户端"""
-        self.api_key = api_key
+        # 优先使用环境变量，其次使用传入参数，最后使用默认值
+        self.api_key = api_key or os.environ.get("DIFY_API_KEY", "app-H3Owfh8VRao6bUv6wFgRt7Kg")
         self.base_url = base_url
         self.workflow_url = f"{base_url}/v1/workflows/run"
         
@@ -37,7 +39,7 @@ class DifyClient:
         # 构建请求数据
         request_data = {
             "inputs": {
-                "speecies": pet_info.get("species", "cat").lower(),  # 物种
+                "species": pet_info.get("species", "cat").lower(),  # 物种
                 "breed": pet_info.get("breed", ""),  # 品种
                 "age_months": pet_info.get("age_months", 12),  # 年龄（月）
                 "allergies": pet_info.get("allergies", ""),  # 过敏史
@@ -196,9 +198,9 @@ class DifyClient:
             "error": error_message
         }
 
-# 全局Dify客户端实例
+# 全局Dify客户端实例 - 使用环境变量或默认值
 dify_client = DifyClient(
-    api_key="app-H3Owfh8VRao6bUv6wFgRt7Kg",
+    api_key=os.environ.get("DIFY_API_KEY", "app-H3Owfh8VRao6bUv6wFgRt7Kg"),
     base_url="https://api.dify.ai"
 )
 

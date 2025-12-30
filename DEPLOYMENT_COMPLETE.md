@@ -123,7 +123,7 @@
 **症状**：产品列表加载失败，显示网络错误
 
 **解决方案**：
-- 检查 `static/app.js` 中的 `API_BASE` 配置
+- 检查 `static/app_fixed.js` 中的 `API_BASE` 配置
 - 确保设置为：`https://pet-food-advisor.onrender.com`
 - 重新推送代码并重新部署
 

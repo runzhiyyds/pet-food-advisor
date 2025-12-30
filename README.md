@@ -30,7 +30,7 @@
 ├── config.json.example    # 配置文件示例
 ├── static/                # 前端静态文件
 │   ├── index.html        # 主页面
-│   └── app.js            # 前端逻辑
+│   └── app_fixed.js      # 前端逻辑
 └── README.md             # 项目说明
 ```
 

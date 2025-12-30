@@ -18,8 +18,8 @@ class DifyAnalysisEngine:
     """Dify分析引擎"""
     
     def __init__(self):
-        # ✅ 使用公网 Dify API
-        self.api_key = "app-H3Owfh8VRao6bUv6wFgRt7Kg"
+        # ✅ 使用公网 Dify API - 优先从环境变量读取
+        self.api_key = os.environ.get("DIFY_API_KEY", "app-H3Owfh8VRao6bUv6wFgRt7Kg")
         self.api_url = "https://api.dify.ai/v1/workflows/run"
         self.timeout = 90  # 90秒超时
     
@@ -431,7 +431,7 @@ class DifyAnalysisEngine:
         
         payload = {
             "inputs": {
-                "speecies": species,
+                "species": species,
                 "breed": pet_info.get("breed", ""),
                 "age_months": age_months,
                 "allergies": allergies,

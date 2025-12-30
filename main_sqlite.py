@@ -439,10 +439,13 @@ async def simple_analysis(request: SimpleAnalysisRequest):
         
         # 使用Dify进行真实分析时，创建分析会话并返回会话ID，前端通过轮询获取进度
         if request.use_dify:
+            logger.info(f"[DIFY] 开始使用Dify分析，产品数量: {len(products)}")
             try:
                 # 生成分析会话ID
                 session_id = generate_analysis_session_id()
                 total_products = len(products)
+                
+                logger.info(f"[DIFY] 会话ID: {session_id}, 总产品数: {total_products}")
                 
                 # 初始化分析状态
                 analysis_status[session_id] = {
@@ -457,8 +460,11 @@ async def simple_analysis(request: SimpleAnalysisRequest):
                 # 在后台线程中执行分析，并实时更新进度
                 def analyze_with_progress():
                     try:
+                        logger.info(f"[DIFY] 后台线程启动，开始调用DifyAnalysisEngine")
                         engine = DifyAnalysisEngine()
                         user_id = request.user_id or "anonymous-user"
+                        
+                        logger.info(f"[DIFY] 调用analyze_products_with_progress, user_id={user_id}")
                         
                         # 使用带进度回调的分析方法
                         dify_results = engine.analyze_products_with_progress(
@@ -467,6 +473,8 @@ async def simple_analysis(request: SimpleAnalysisRequest):
                                 session_id, completed, total, current
                             )
                         )
+                        
+                        logger.info(f"[DIFY] 分析完成，结果类型: {type(dify_results)}")
                         
                         # 确保返回结构为字典
                         if not isinstance(dify_results, dict):
@@ -482,8 +490,11 @@ async def simple_analysis(request: SimpleAnalysisRequest):
                             "message": "分析完成",
                             "result": dify_results
                         }
+                        
+                        logger.info(f"[DIFY] 会话 {session_id} 分析完成")
+                        
                     except Exception as e:
-                        logger.error(f"Dify分析失败: {e}")
+                        logger.error(f"[DIFY] 分析失败: {e}", exc_info=True)
                         analysis_status[session_id] = {
                             "status": "failed",
                             "progress": 0,
@@ -496,6 +507,8 @@ async def simple_analysis(request: SimpleAnalysisRequest):
                 # 启动后台分析任务
                 threading.Thread(target=analyze_with_progress, daemon=True).start()
                 
+                logger.info(f"[DIFY] 后台任务已启动，返回会话ID给前端")
+                
                 # 立即返回会话ID，让前端开始轮询
                 return {
                     "success": True,
@@ -504,9 +517,10 @@ async def simple_analysis(request: SimpleAnalysisRequest):
                     "message": "分析已启动，请轮询进度"
                 }
             except Exception as e:
-                logger.error(f"Dify分析启动失败，降级为模拟: {e}")
+                logger.error(f"[DIFY] 分析启动失败，降级为模拟: {e}", exc_info=True)
         
         # Dify 不可用或未启用时，使用简单的本地评分逻辑进行降级
+        logger.warning(f"[FALLBACK] 使用模拟分析，use_dify={request.use_dify}")
         import random
         fallback_results: List[Dict[str, Any]] = []
         for prod in products:

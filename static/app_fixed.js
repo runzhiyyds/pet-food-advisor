@@ -1,8 +1,7 @@
 // 导入模块
 import { ProductSelector } from './products.js';
 import { ResultsDisplay } from './results.js';
-import { HistoryManager } from './history.js';
-import { ShareManager } from './share.js';
+// HistoryManager 和 ShareManager 通过 window 对象全局访问
 
 // 生成或获取用户ID
 function getOrCreateUserId() {

@@ -1,5 +1,5 @@
 // 分享功能模块
-export const ShareManager = {
+const ShareManager = {
     /**
      * 生成分享链接（URL编码方式）
      * @param {Object} analysisData - 分析数据

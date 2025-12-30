@@ -1,5 +1,5 @@
 // 历史记录管理模块
-export const HistoryManager = {
+const HistoryManager = {
     STORAGE_KEY: 'pet_food_analysis_history',
     MAX_HISTORY: 20, // 最多保存20条记录
     

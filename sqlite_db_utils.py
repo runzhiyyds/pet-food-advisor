@@ -9,23 +9,31 @@ import os
 import json
 from typing import Dict, List, Any, Optional
 import logging
+import threading
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SQLiteDB:
-    def __init__(self, db_path: str = "pet_food_selection.db"):
+    def __init__(self, db_path: str = None):
         """初始化SQLite数据库连接"""
-        self.db_path = db_path
+        self.db_path = db_path or os.getenv("DATABASE_PATH", "pet_food_selection.db")
         self.connection = None
+        self._lock = threading.RLock()
         self.connect()
     
     def connect(self):
         """连接到SQLite数据库"""
         try:
-            self.connection = sqlite3.connect(self.db_path, check_same_thread=False)
+            self.connection = sqlite3.connect(
+                self.db_path,
+                check_same_thread=False,
+                timeout=10,
+            )
             self.connection.row_factory = sqlite3.Row  # 使结果可以通过列名访问
+            self.connection.execute("PRAGMA journal_mode=WAL")
+            self.connection.execute("PRAGMA busy_timeout=10000")
             logger.info(f"✅ SQLite数据库连接成功: {self.db_path}")
         except Exception as e:
             logger.error(f"❌ SQLite数据库连接失败: {e}")
@@ -34,17 +42,16 @@ class SQLiteDB:
     def execute_query(self, query: str, params: tuple = None) -> List[Dict]:
         """执行查询并返回结果"""
         try:
-            cursor = self.connection.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            
-            # 获取结果
-            rows = cursor.fetchall()
-            result = [dict(row) for row in rows]
-            cursor.close()
-            return result
+            with self._lock:
+                cursor = self.connection.cursor()
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                rows = cursor.fetchall()
+                result = [dict(row) for row in rows]
+                cursor.close()
+                return result
         except Exception as e:
             logger.error(f"查询执行失败: {e}")
             logger.error(f"SQL: {query}")
@@ -54,23 +61,23 @@ class SQLiteDB:
     def execute_update(self, query: str, params: tuple = None) -> int:
         """执行更新/插入/删除操作"""
         try:
-            cursor = self.connection.cursor()
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-            
-            self.connection.commit()
-            affected_rows = cursor.rowcount
-            last_id = cursor.lastrowid
-            cursor.close()
-            
-            return last_id if last_id else affected_rows
+            with self._lock:
+                cursor = self.connection.cursor()
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                self.connection.commit()
+                affected_rows = cursor.rowcount
+                last_id = cursor.lastrowid
+                cursor.close()
+                return last_id if last_id else affected_rows
         except Exception as e:
             logger.error(f"更新执行失败: {e}")
             logger.error(f"SQL: {query}")
             logger.error(f"参数: {params}")
-            self.connection.rollback()
+            with self._lock:
+                self.connection.rollback()
             raise
     
     def close(self):
@@ -100,10 +107,14 @@ def init_sqlite_database():
     create_pet_info_table = """
     CREATE TABLE IF NOT EXISTS pet_info (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id TEXT,
         species TEXT NOT NULL,
         breed TEXT,
         age_months INTEGER,
         weight_kg REAL,
+        is_neutered INTEGER,
+        activity_level TEXT,
+        eating_preference TEXT,
         health_status TEXT,
         allergies TEXT,
         doctor_notes TEXT,
@@ -167,6 +178,7 @@ def init_sqlite_database():
         db.execute_update(create_products_table)
         db.execute_update(create_analysis_sessions_table)
         db.execute_update(create_anonymous_mapping_table)
+        _ensure_pet_info_columns()
         _ensure_product_columns()
         
         logger.info("✅ SQLite数据库表结构创建成功")
@@ -181,6 +193,25 @@ def init_sqlite_database():
     except Exception as e:
         logger.error(f"❌ 数据库初始化失败: {e}")
         return False
+
+def _ensure_pet_info_columns():
+    """为旧数据库补齐幂等保存所需字段。"""
+    columns = db.execute_query("PRAGMA table_info(pet_info)")
+    existing = {c['name'] for c in columns}
+    if 'client_id' not in existing:
+        db.execute_update("ALTER TABLE pet_info ADD COLUMN client_id TEXT")
+    additions = {
+        'is_neutered': 'INTEGER',
+        'activity_level': 'TEXT',
+        'eating_preference': 'TEXT',
+    }
+    for name, column_type in additions.items():
+        if name not in existing:
+            db.execute_update(f"ALTER TABLE pet_info ADD COLUMN {name} {column_type}")
+    db.execute_update(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_pet_info_client_id "
+        "ON pet_info(client_id)"
+    )
 
 def _ensure_product_columns():
     """在已有表上补充缺失的列，避免老数据库报错"""

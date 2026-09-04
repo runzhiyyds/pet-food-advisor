@@ -551,9 +551,15 @@ export const ResultsDisplay = {
             // 等待字体和图片加载
             await new Promise(resolve => setTimeout(resolve, 500));
             
-            // 使用html2canvas生成图片
+            // 仅在用户导出时加载，避免阻塞首次打开页面。
             if (typeof html2canvas === 'undefined') {
-                throw new Error('html2canvas库未加载，请刷新页面重试');
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('图片组件加载失败，请稍后重试'));
+                    document.head.appendChild(script);
+                });
             }
             
             const canvas = await html2canvas(tempContainer, {

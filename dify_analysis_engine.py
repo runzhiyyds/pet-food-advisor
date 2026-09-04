@@ -41,8 +41,7 @@ class DifyAnalysisEngine:
         progress_callback: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
-        分析产品列表（并发版本）
-        每5秒提交一次请求，不等待上一个完成，缩短总等待时间
+        分析产品列表（受控并发版本）
         
         Args:
             pet_info: 宠物信息
@@ -54,15 +53,17 @@ class DifyAnalysisEngine:
             分析结果，包含评分和排序
         """
         print(f"[DEBUG] 开始并发分析 {len(products)} 款产品...")
-        print(f"[DEBUG] 策略：每5秒提交一次请求，不等待完成")
+        max_workers = max(1, min(int(os.getenv("DIFY_MAX_WORKERS", "5")), 8, len(products)))
+        stagger_seconds = max(0, float(os.getenv("DIFY_REQUEST_STAGGER_SECONDS", "0.25")))
+        print(f"[DEBUG] 策略：{max_workers} 路并发，提交间隔 {stagger_seconds} 秒")
         
         results = []
         futures = []
         start_times = {}  # 记录每个请求的启动时间
         
         # 使用线程池执行并发请求
-        with ThreadPoolExecutor(max_workers=min(len(products), 10)) as executor:
-            # 为每个产品提交分析任务，每5秒间隔
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 短间隔提交，兼顾总耗时与上游限流风险
             for i, product in enumerate(products):
                 product_id = product.get('id', i)
                 print(f"[DEBUG] 提交产品 {i+1}/{len(products)} 的分析任务: {product.get('brand', '')} - {product.get('product_name', '')}")
@@ -72,10 +73,8 @@ class DifyAnalysisEngine:
                 futures.append((future, product, i))
                 start_times[product_id] = time.time()
                 
-                # 每5秒提交下一个请求（最后一个不需要等待）
-                if i < len(products) - 1:
-                    time.sleep(5)
-                    print(f"[DEBUG] 已等待5秒，继续提交下一个请求...")
+                if i < len(products) - 1 and stagger_seconds:
+                    time.sleep(stagger_seconds)
             
             # 收集所有结果，使用as_completed实时获取完成的结果
             print(f"[DEBUG] 所有请求已提交，等待结果返回...")
@@ -370,7 +369,7 @@ class DifyAnalysisEngine:
         raw_material = self._build_raw_material(ingredients, additives_data)
         
         # 转换物种名称
-        species_map = {"猫": "cat", "狗": "dog"}
+        species_map = {"猫": "cat", "狗": "dog", "cat": "cat", "dog": "dog"}
         species = species_map.get(pet_info.get("species", "猫"), "cat")
         
         # 转换活动水平
@@ -397,7 +396,7 @@ class DifyAnalysisEngine:
             allergies = "无"
         
         # 确保weight_kg是浮点数（处理None的情况）
-        weight_value = pet_info.get("weight")
+        weight_value = pet_info.get("weight_kg")
         if weight_value is None or weight_value == "":
             weight_kg = 4.0  # 默认值
         else:

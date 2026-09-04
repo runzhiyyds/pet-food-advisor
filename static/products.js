@@ -8,6 +8,28 @@ export const ProductSelector = {
     // 产品缓存配置
     CACHE_KEY: 'pet_food_products_cache',
     CACHE_EXPIRY: 24 * 60 * 60 * 1000, // 24小时
+    prefetchRequests: {},
+
+    // 用户填写资料时提前拉取产品，提交后通常可以立即展示
+    prefetch(species) {
+        if (!species || this.getCachedProducts(species)) return Promise.resolve();
+        if (this.prefetchRequests[species]) return this.prefetchRequests[species];
+
+        this.prefetchRequests[species] = fetch(
+            `${window.API_BASE}/api/products?species=${encodeURIComponent(species)}&limit=100`,
+            { signal: AbortSignal.timeout(45000) }
+        )
+            .then(response => response.ok ? response.json() : null)
+            .then(data => {
+                if (data?.success && Array.isArray(data.products) && data.products.length) {
+                    this.setCachedProducts(species, data.products);
+                }
+            })
+            .catch(() => null)
+            .finally(() => { delete this.prefetchRequests[species]; });
+
+        return this.prefetchRequests[species];
+    },
     
     // 初始化产品选择页面
     async init(container, petInfo) {
@@ -109,10 +131,18 @@ export const ProductSelector = {
             
             // 2. 缓存未命中，从API加载
             console.log('[API] 从服务器加载产品...');
-            const response = await fetch(`${window.API_BASE}/api/products?species=${species}&limit=100`, {
+            await this.prefetchRequests[species];
+            const warmedProducts = this.getCachedProducts(species);
+            if (warmedProducts?.length) {
+                this.allProducts = warmedProducts;
+                this.filteredProducts = [...warmedProducts];
+                return;
+            }
+
+            const response = await fetch(`${window.API_BASE}/api/products?species=${encodeURIComponent(species)}&limit=100`, {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' },
-                signal: AbortSignal.timeout(10000) // 10秒超时
+                signal: AbortSignal.timeout(45000) // 兼容免费实例首次唤醒
             });
             
             if (!response.ok) {
@@ -140,7 +170,7 @@ export const ProductSelector = {
         } catch (error) {
             console.error('加载产品失败:', error);
             if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-                window.showMessage('请求超时，请检查网络连接后重试', 'error');
+                window.showMessage('产品服务仍在启动，可返回后重试', 'warning');
             } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 window.showMessage('网络连接失败，请检查网络设置', 'error');
             } else {
@@ -190,7 +220,7 @@ export const ProductSelector = {
                         <div class="text-sm text-blue-800">
                             <p class="font-bold mb-2">💡 选择方式：</p>
                             <ul class="space-y-1">
-                                <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>从下方产品库中勾选您想要对比的产品（建议3-10款）</li>
+                                <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>从下方产品库中勾选想对比的产品（建议3-5款，最多8款）</li>
                                 <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>或使用搜索框查找特定产品</li>
                                 <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>或点击"手动输入产品"按钮，输入您自己的产品信息</li>
                                 <li class="flex items-center"><span class="w-2 h-2 bg-blue-400 rounded-full mr-2"></span>或点击"让系统直接推荐"按钮，由系统自动筛选</li>
@@ -313,7 +343,7 @@ export const ProductSelector = {
                                 <i class="fas fa-robot mr-2"></i>🤖 分析模式
                             </h4>
                             <p class="text-sm text-blue-600" id="analysisMode-description">
-                                使用真实AI进行深度分析，耗时约60秒/产品
+                                使用真实AI并行分析，通常约30-90秒
                             </p>
                         </div>
                         <div class="flex items-center space-x-4">
@@ -482,8 +512,8 @@ export const ProductSelector = {
         if (index > -1) {
             this.selectedProducts.splice(index, 1);
         } else {
-            if (this.selectedProducts.length >= 20) {
-                window.showMessage('最多选择20款产品进行对比', 'warning');
+            if (this.selectedProducts.length >= 8) {
+                window.showMessage('一次最多对比8款；建议选3-5款，结果更快也更好读', 'warning');
                 return;
             }
             this.selectedProducts.push(productId);
@@ -674,7 +704,7 @@ export const ProductSelector = {
                 const description = document.getElementById('analysisMode-description');
                 if (description) {
                     if (e.target.checked) {
-                        description.textContent = '使用真实AI进行深度分析，耗时约60秒/产品';
+                        description.textContent = '使用真实AI并行分析，通常约30-90秒';
                         description.className = 'text-sm text-blue-600';
                     } else {
                         description.textContent = '使用模拟算法快速分析，耗时约2秒/产品';
@@ -1047,7 +1077,7 @@ export const ProductSelector = {
         });
 
         // 4. 按价格分组，确保推荐的产品价格方差较大
-        const maxCount = 10;
+        const maxCount = 8;
         if (recommended.length > maxCount) {
             // 将产品按价格分成3-4个区间
             const priceGroups = [];
@@ -1126,8 +1156,8 @@ export const ProductSelector = {
             return;
         }
         
-        if (this.selectedProducts.length > 20) {
-            window.showMessage('建议选择3-10款产品进行对比，当前选择过多', 'warning');
+        if (this.selectedProducts.length > 8) {
+            window.showMessage('一次最多对比8款产品', 'warning');
             return;
         }
         

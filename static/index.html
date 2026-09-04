@@ -12,7 +12,7 @@
             const hostname = window.location.hostname;
             if (hostname === 'localhost' || hostname === '127.0.0.1') {
                 // 本地开发环境
-                window.API_BASE_URL = 'http://localhost:8000';
+                window.API_BASE_URL = window.location.origin;
                 console.log('[DEBUG] 本地开发模式，API地址:', window.API_BASE_URL);
             } else {
                 // 生产环境：指向 Render 后端服务
@@ -23,7 +23,6 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         /* 宠物训练类APP风格 - 温馨治愈的扁平插画风格 */
         :root {
@@ -477,9 +476,9 @@
 
                         <div class="max-w-2xl mx-auto">
                             <label class="block text-lg font-bold text-gray-800 mb-3">
-                                品种 <span class="text-orange-400">*</span>
+                                品种 <span class="text-sm font-normal text-gray-500">（选填）</span>
                             </label>
-                            <input type="text" id="breed" placeholder="例如：英国短毛猫、金毛、布偶猫等" required
+                            <input type="text" id="breed" placeholder="例如：英国短毛猫、金毛；不确定可留空"
                                 class="form-input w-full text-lg">
                             <p class="text-sm text-gray-500 mt-2 flex items-center">
                                 <i class="fas fa-lightbulb text-yellow-400 mr-2"></i>
@@ -677,7 +676,7 @@
                 <span class="text-gray-700 font-medium">用爱守护每一只毛孩子</span>
                 <i class="fas fa-heart text-pink-400"></i>
             </div>
-            <p class="text-sm text-gray-600">© 2025 宠物口粮智能助手 | 科学选粮，为爱宠健康护航 🐾</p>
+            <p class="text-sm text-gray-600">© 2026 宠物口粮智能助手 | 科学选粮，为爱宠健康护航 🐾</p>
         </div>
     </footer>
 

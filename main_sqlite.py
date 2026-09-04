@@ -50,10 +50,14 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 数据模型
 class PetInfo(BaseModel):
+    client_id: Optional[str] = None  # 前端记录ID，用于重试时幂等保存
     species: str  # 物种：猫/狗
     breed: Optional[str] = None  # 品种
     age_months: Optional[int] = None  # 年龄（月）
     weight_kg: Optional[float] = None  # 体重（公斤）
+    is_neutered: Optional[bool] = None
+    activity_level: Optional[str] = None
+    eating_preference: Optional[str] = None
     health_status: Optional[str] = None  # 健康状况
     allergies: Optional[str] = None  # 过敏史
     doctor_notes: Optional[str] = None  # 医生叮嘱
@@ -180,21 +184,41 @@ async def health_check():
 
 @app.post("/api/pet/create")
 async def create_pet(pet_info: PetInfo):
-    """创建宠物信息"""
+    """创建或更新宠物信息；同一 client_id 的重试不会生成重复记录。"""
     try:
-        # 插入宠物信息
+        client_id = pet_info.client_id.strip()[:80] if pet_info.client_id else None
         insert_query = """
-        INSERT INTO pet_info (species, breed, age_months, weight_kg, health_status, 
+        INSERT INTO pet_info (client_id, species, breed, age_months, weight_kg,
+                             is_neutered, activity_level, eating_preference, health_status,
                              allergies, doctor_notes, budget_mode, monthly_budget, 
                              price_range_min, price_range_max)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(client_id) DO UPDATE SET
+            species = excluded.species,
+            breed = excluded.breed,
+            age_months = excluded.age_months,
+            weight_kg = excluded.weight_kg,
+            is_neutered = excluded.is_neutered,
+            activity_level = excluded.activity_level,
+            eating_preference = excluded.eating_preference,
+            health_status = excluded.health_status,
+            allergies = excluded.allergies,
+            doctor_notes = excluded.doctor_notes,
+            budget_mode = excluded.budget_mode,
+            monthly_budget = excluded.monthly_budget,
+            price_range_min = excluded.price_range_min,
+            price_range_max = excluded.price_range_max
         """
         
         pet_id = db.execute_update(insert_query, (
+            client_id,
             pet_info.species,
             pet_info.breed,
             pet_info.age_months,
             pet_info.weight_kg,
+            pet_info.is_neutered,
+            pet_info.activity_level,
+            pet_info.eating_preference,
             pet_info.health_status,
             pet_info.allergies,
             pet_info.doctor_notes,
@@ -203,6 +227,12 @@ async def create_pet(pet_info: PetInfo):
             pet_info.price_range_min,
             pet_info.price_range_max
         ))
+
+        if client_id:
+            saved = db.execute_query(
+                "SELECT id FROM pet_info WHERE client_id = ?", (client_id,)
+            )
+            pet_id = saved[0]["id"]
         
         logger.info(f"创建宠物信息成功，ID: {pet_id}")
         return {"success": True, "pet_id": pet_id, "message": "宠物信息保存成功"}

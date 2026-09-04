@@ -15,15 +15,15 @@
 ## 技术栈
 
 - **后端**：Python + FastAPI
-- **数据库**：MySQL
+- **数据库**：SQLite（当前线上版本）
 - **前端**：HTML + Tailwind CSS + Vanilla JavaScript
-- **部署**：Docker
+- **部署**：Vercel 前端 + Render FastAPI 后端
 
 ## 项目结构
 
 ```
 .
-├── main.py                 # FastAPI主程序
+├── main_sqlite.py          # 当前 FastAPI 主程序
 ├── requirements.txt        # Python依赖
 ├── Dockerfile             # Docker配置
 ├── init_database.sql      # 数据库初始化脚本
@@ -48,44 +48,30 @@
 pip install -r requirements.txt
 ```
 
-### 3. 配置数据库
-
-设置环境变量：
+### 3. 启动服务
 
 ```bash
-export MYSQL_HOST=your_host
-export MYSQL_PORT=3306
-export MYSQL_USER=your_user
-export MYSQL_PASSWORD=your_password
-export MYSQL_DATABASE=7hmbua0z
-```
-
-### 4. 初始化数据库
-
-```bash
-mysql -h your_host -u your_user -p your_database < init_database.sql
-```
-
-### 5. 启动服务
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main_sqlite:app --host 0.0.0.0 --port 8000
 ```
 
 访问 `http://localhost:8000/static/` 查看应用。
 
-### 6. Docker部署（推荐）
+### 4. Docker 部署
 
 ```bash
 docker build -t pet-food-advisor .
-docker run -d -p 8000:8000 \
-  -e MYSQL_HOST=your_host \
-  -e MYSQL_PORT=3306 \
-  -e MYSQL_USER=your_user \
-  -e MYSQL_PASSWORD=your_password \
-  -e MYSQL_DATABASE=7hmbua0z \
-  pet-food-advisor
+docker run -d -p 8000:8000 pet-food-advisor
 ```
+
+## 当前线上架构
+
+- 前端：<https://pet-food-advisor.vercel.app/>
+- 后端：<https://pet-food-advisor.onrender.com/>
+- 首次进入页面会在后台唤醒后端；宠物资料先保存到浏览器，再幂等同步到后端，因此冷启动不会阻塞进入产品选择页。
+- 产品列表按物种缓存 24 小时，并在用户选择猫/狗后提前加载。
+- 真实 AI 分析采用受控并发，可通过 `DIFY_MAX_WORKERS` 和 `DIFY_REQUEST_STAGGER_SECONDS` 调整。
+
+> Render 的临时 SQLite 文件不适合作为长期用户数据存储。当前产品以浏览器本地资料为连续体验来源；如需跨设备账号与长期留存，应迁移到托管 PostgreSQL。
 
 ## API文档
 

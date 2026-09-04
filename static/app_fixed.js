@@ -43,8 +43,26 @@ const appState = {
     customProducts: [],
     useDify: true,
     analysisResult: null,
-    userId: getOrCreateUserId()  // 用户ID
+    userId: getOrCreateUserId(),  // 用户ID
+    petSavePromise: null,
+    submitInFlight: false
 };
+
+const PET_DRAFT_KEY = 'pet_food_advisor_pet_draft_v2';
+const PET_RECORD_KEY = 'pet_food_advisor_pet_record_id';
+
+function getOrCreatePetRecordId() {
+    try {
+        let recordId = localStorage.getItem(PET_RECORD_KEY);
+        if (!recordId) {
+            recordId = `pet_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+            localStorage.setItem(PET_RECORD_KEY, recordId);
+        }
+        return recordId;
+    } catch (_) {
+        return `pet_${appState.userId}`;
+    }
+}
 
 // API基础URL - 根据环境自动选择
 const API_BASE = (() => {
@@ -55,7 +73,7 @@ const API_BASE = (() => {
     // 根据当前域名判断环境
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:8000';  // 本地开发
+        return window.location.origin;  // 本地开发，兼容任意端口
     }
     // 生产环境：如果未设置 API_BASE_URL，提示错误
     console.error('[ERROR] 生产环境未配置 API_BASE_URL，请在 index.html 中设置 window.API_BASE_URL');
@@ -69,8 +87,8 @@ window.API_BASE = API_BASE;
 
 // 工具函数
 const showStep = (stepNumber) => {
-    // 隐藏所有步骤（精简为3步）
-    for (let i = 1; i <= 3; i++) {
+    // 隐藏所有步骤并更新四步进度
+    for (let i = 1; i <= 4; i++) {
         const content = document.getElementById(`step${i}-content`);
         const indicator = document.getElementById(`step${i}-indicator`);
         if (content) content.classList.add('hidden');
@@ -108,6 +126,8 @@ const showMessage = (message, type = 'info') => {
     
     const messageDiv = document.createElement('div');
     messageDiv.className = `fixed top-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity`;
+    messageDiv.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    messageDiv.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
     messageDiv.textContent = message;
     document.body.appendChild(messageDiv);
     
@@ -123,6 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 检查是否需要显示引导
     checkAndShowOnboarding();
+    // 用户填写表单的同时唤醒后端，不阻塞首屏和后续操作。
+    fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(45000) }).catch(() => null);
     
     // 延迟初始化，确保所有元素都已渲染
     setTimeout(() => {
@@ -204,6 +226,9 @@ function initStep1() {
     const form = document.getElementById('petInfoForm');
     const toggleBtn = document.getElementById('toggleMoreOptions');
     const moreOptions = document.getElementById('moreOptions');
+    restorePetDraft(form);
+    form?.addEventListener('input', debounce(savePetDraft, 250));
+    form?.addEventListener('change', savePetDraft);
     
     console.log('[DEBUG] 找到的元素:', {
         form: !!form,
@@ -463,6 +488,7 @@ function initStep1() {
                     if (selectedCard) {
                         selectedCard.classList.add('selected');
                         console.log('[DEBUG] 宠物类型选择完成:', selectedRadio.value);
+                        ProductSelector.prefetch(selectedRadio.value);
                     }
                 }
             }, 10);
@@ -480,33 +506,19 @@ function initStep1() {
     }
     
     // 6. 确保顶部和底部按钮也能触发提交
-    const nextStepTop = document.getElementById('nextStepTop');
     const nextStepBottom = document.getElementById('nextStepBottom');
-    const triggerSubmit = async (e) => {
+    const triggerSubmit = (e) => {
         e.preventDefault();
-        e.stopPropagation();
-        console.log('[DEBUG] 按钮点击触发提交');
-        await handlePetInfoSubmit();
-        return false;
+        form?.requestSubmit();
     };
-    if (nextStepTop) {
-        // 移除可能存在的旧事件监听器
-        nextStepTop.onclick = null;
-        // 使用capture阶段确保优先执行
-        nextStepTop.addEventListener('click', triggerSubmit, true);
-    }
-    if (nextStepBottom) {
-        // 移除可能存在的旧事件监听器
-        nextStepBottom.onclick = null;
-        // 使用capture阶段确保优先执行
-        nextStepBottom.addEventListener('click', triggerSubmit, true);
-    }
+    nextStepBottom?.addEventListener('click', triggerSubmit);
     
     console.log('[DEBUG] 步骤1初始化完成');
 }
 
 // 处理宠物信息提交
 async function handlePetInfoSubmit() {
+    if (appState.submitInFlight) return;
     try {
         console.log('[DEBUG] ========== 开始提交宠物信息 ==========');
         
@@ -532,12 +544,6 @@ async function handlePetInfoSubmit() {
         if (!species) {
             console.log('[DEBUG] 验证失败: 未选择宠物类型');
             showMessage('请选择宠物类型', 'warning');
-            return;
-        }
-        
-        if (!breed) {
-            console.log('[DEBUG] 验证失败: 未输入品种');
-            showMessage('请输入宠物品种', 'warning');
             return;
         }
         
@@ -602,10 +608,14 @@ async function handlePetInfoSubmit() {
         console.log('[DEBUG] 年龄转换:', { ageValue, ageUnit, ageMonths });
         
         const petData = {
+            client_id: getOrCreatePetRecordId(),
             species,
-            breed,
+            breed: breed || null,
             age_months: ageMonths,
             weight_kg: weight,
+            is_neutered: isNeutered,
+            activity_level: activityLevel,
+            eating_preference: eatingPreference,
             health_status: healthStatus.length > 0 ? healthStatus.join(', ') : null,
             allergies: allergies.length > 0 ? allergies.join(', ') : null,
             doctor_notes: doctorNotes,
@@ -618,87 +628,86 @@ async function handlePetInfoSubmit() {
         
         console.log('[DEBUG] 完整提交数据:', JSON.stringify(petData, null, 2));
         
-        // 提交到后端
-        console.log('[DEBUG] 发送请求到:', `${API_BASE}/api/pet/create`);
-        
-        // 显示加载提示（如果Render实例休眠，首次请求可能需要50秒）
-        showMessage('正在保存宠物信息，请稍候...', 'info');
-        
-        let response;
-        try {
-            response = await fetch(`${API_BASE}/api/pet/create`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(petData),
-                // 设置超时时间（60秒，考虑Render休眠唤醒时间）
-                signal: AbortSignal.timeout(60000)
-            });
-        } catch (error) {
-            if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-                console.error('[ERROR] 请求超时:', error);
-                showMessage('请求超时，可能是服务器正在唤醒（免费版首次请求可能需要50秒），请稍后重试', 'warning');
-                return;
-            }
-            console.error('[ERROR] 网络错误:', error);
-            showMessage('网络连接失败，请检查网络后重试', 'error');
-            return;
-        }
-        
-        console.log('[DEBUG] 响应状态码:', response.status);
-        console.log('[DEBUG] 响应状态文本:', response.statusText);
-        
-        // 检查HTTP状态码
-        if (!response.ok) {
-            let errorMessage = '保存失败，请重试';
-            try {
-                const errorData = await response.json();
-                console.error('[ERROR] 错误响应数据:', errorData);
-                errorMessage = errorData.detail || errorMessage;
-            } catch (e) {
-                const errorText = await response.text();
-                console.error('[ERROR] 服务器错误文本:', errorText);
-                errorMessage = `服务器错误 (${response.status}): ${errorText.substring(0, 100)}`;
-            }
-            showMessage(errorMessage, 'error');
-            return;
-        }
-        
-        let result;
-        try {
-            result = await response.json();
-        } catch (jsonError) {
-            console.error('[ERROR] JSON解析失败:', jsonError);
-            showMessage('服务器响应格式错误，请重试', 'error');
-            return;
-        }
-        
-        console.log('[DEBUG] 成功响应结果:', result);
-        
-        if (result.success && result.pet_id) {
-            appState.petInfo = { ...petData, id: result.pet_id };
-            console.log('[DEBUG] 保存到全局状态:', appState.petInfo);
-            showMessage('宠物信息保存成功！', 'success');
-            
-            // 延迟跳转到下一步
-            setTimeout(() => {
-                console.log('[DEBUG] 跳转到步骤2');
-                showStep(2);
-                initStep2();
-            }, 1000);
-        } else {
-            console.error('[ERROR] 保存失败:', result.message);
-            showMessage(result.message || '保存失败，请重试', 'error');
-        }
+        appState.submitInFlight = true;
+        appState.petInfo = petData;
+        savePetDraft();
+
+        // 本地资料足够支撑后续分析，立即进入下一步；云端保存不再阻塞用户。
+        showStep(2);
+        const productLoad = initStep2();
+        appState.petSavePromise = syncPetInBackground(petData);
+        await productLoad;
         
     } catch (error) {
         console.error('[ERROR] ========== 提交异常 ==========');
         console.error('[ERROR] 错误类型:', error.name);
         console.error('[ERROR] 错误消息:', error.message);
         console.error('[ERROR] 错误堆栈:', error.stack);
-        showMessage('网络错误，请检查连接', 'error');
+        showMessage('资料处理失败，请重试', 'error');
+    } finally {
+        appState.submitInFlight = false;
     }
+}
+
+async function syncPetInBackground(petData) {
+    try {
+        const response = await fetch(`${API_BASE}/api/pet/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(petData),
+            signal: AbortSignal.timeout(45000)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+        if (result.success && result.pet_id && appState.petInfo?.client_id === petData.client_id) {
+            appState.petInfo.id = result.pet_id;
+            showMessage('宠物资料已同步', 'success');
+        }
+    } catch (error) {
+        console.warn('[WARN] 云端同步暂未完成，将继续使用本机资料:', error);
+        showMessage('已保存在本机，可继续选择；云端暂未同步', 'warning');
+    }
+}
+
+function debounce(fn, wait) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), wait);
+    };
+}
+
+function savePetDraft() {
+    const form = document.getElementById('petInfoForm');
+    if (!form) return;
+    try {
+        const values = {};
+        form.querySelectorAll('input, select, textarea').forEach(field => {
+            if (!field.id && !field.name) return;
+            const key = field.id || `${field.name}:${field.value}`;
+            values[key] = (field.type === 'checkbox' || field.type === 'radio') ? field.checked : field.value;
+        });
+        localStorage.setItem(PET_DRAFT_KEY, JSON.stringify(values));
+    } catch (_) {}
+}
+
+function restorePetDraft(form) {
+    if (!form) return;
+    try {
+        const values = JSON.parse(localStorage.getItem(PET_DRAFT_KEY) || '{}');
+        form.querySelectorAll('input, select, textarea').forEach(field => {
+            const key = field.id || `${field.name}:${field.value}`;
+            if (!(key in values)) return;
+            if (field.type === 'checkbox' || field.type === 'radio') {
+                field.checked = Boolean(values[key]);
+                field.closest('label')?.classList.toggle('selected', field.checked);
+            } else {
+                field.value = values[key];
+            }
+        });
+        const restoredSpecies = form.querySelector('input[name="species"]:checked')?.value;
+        if (restoredSpecies) ProductSelector.prefetch(restoredSpecies);
+    } catch (_) {}
 }
 
 // 步骤2：产品选择
@@ -741,7 +750,7 @@ window.initStep3 = async function() {
             <div class="py-6">
                 <div class="inline-block animate-spin rounded-full h-14 w-14 border-t-4 border-b-4 border-purple-600 mb-4"></div>
                 <p class="text-gray-700 text-lg" id="progressText">正在分析 ${totalCandidates} 款产品...</p>
-                <p class="text-sm text-gray-500 mt-1" id="progressDetail">${useDify ? '预估等待1~2分钟' : '⚡ 快速模拟'}</p>
+                <p class="text-sm text-gray-500 mt-1" id="progressDetail">${useDify ? '多款产品将并行分析，通常约30-90秒' : '⚡ 快速模拟'}</p>
                 <div class="mt-4 w-full max-w-md mx-auto">
                     <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div id="progressBar" class="h-full bg-purple-500 w-0 transition-all duration-300"></div>
@@ -783,16 +792,14 @@ window.initStep3 = async function() {
 
     try {
         const payload = {
-            pet_id: appState.petInfo?.id || null,
+            // 始终携带资料，避免云端保存进度或实例重启影响分析。
+            pet_id: null,
+            pet: appState.petInfo || null,
             product_ids: appState.selectedProducts || [],
             custom_products: appState.customProducts || [],
             use_dify: useDify,
             user_id: appState.userId || getOrCreateUserId()  // 传递用户ID
         };
-
-        if (!payload.pet_id && appState.petInfo) {
-            payload.pet = appState.petInfo;
-        }
 
         // 启动分析请求
         let res;
@@ -868,7 +875,7 @@ window.initStep3 = async function() {
                         if (completed > 0 && completed < total) {
                             progressDetail.textContent = `已完成 ${completed}/${total} 款产品的分析`;
                         } else if (completed === 0) {
-                            progressDetail.textContent = '预估等待1~2分钟';
+                            progressDetail.textContent = '模型正在读取配方与宠物资料，请稍候';
                         } else {
                             progressDetail.textContent = `已完成 ${completed}/${total} 款产品的分析`;
                         }
